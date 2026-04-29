@@ -1,0 +1,95 @@
+{
+  "name": "mermaid-preview",
+  "displayName": "Mermaid Architecture Preview",
+  "description": "Live preview of Mermaid diagrams with custom icon support for architecture diagrams",
+  "version": "0.1.0",
+  "publisher": "your-publisher-id",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Visualization"],
+  "activationEvents": [
+    "onLanguage:mermaid",
+    "onCommand:mermaidPreview.openPreview"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "mermaid",
+        "extensions": [".mmd", ".mermaid"],
+        "aliases": ["Mermaid"]
+      }
+    ],
+    "commands": [
+      {
+        "command": "mermaidPreview.openPreview",
+        "title": "Mermaid: Open Preview",
+        "icon": {
+          "light": "./media/preview-icon.svg",
+          "dark": "./media/preview-icon.svg"
+        }
+      },
+      {
+        "command": "mermaidPreview.exportSVG",
+        "title": "Mermaid: Export as SVG"
+      },
+      {
+        "command": "mermaidPreview.exportPNG",
+        "title": "Mermaid: Export as PNG"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceLangId == mermaid",
+          "command": "mermaidPreview.openPreview",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Mermaid Preview",
+      "properties": {
+        "mermaidPreview.icons": {
+          "type": "object",
+          "default": {},
+          "description": "Custom SVG icons for architecture diagrams. Keys are 'prefix:name', values are local file paths or remote URLs to SVG files.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "mermaidPreview.iconPacks": {
+          "type": "array",
+          "default": [],
+          "description": "URLs to Iconify JSON icon packs (e.g. https://unpkg.com/@iconify-json/logos@1/icons.json).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mermaidPreview.theme": {
+          "type": "string",
+          "enum": ["auto", "light", "dark"],
+          "default": "auto",
+          "description": "Mermaid rendering theme. 'auto' matches VS Code's current theme."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "test": "vitest run",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "mermaid": "^11.14.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.118.0",
+    "@vscode/vsce": "^3.9.1",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}
