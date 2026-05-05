@@ -3,7 +3,20 @@
   "displayName": "Mermaid Architecture Preview",
   "description": "Live preview of Mermaid diagrams with custom icon support for architecture diagrams",
   "version": "0.1.0",
-  "publisher": "your-publisher-id",
+  "publisher": "TylerSatter",
+  "author": {
+    "name": "Tyler Satter"
+  },
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tylersatter13/mermaid-preview"
+  },
+  "homepage": "https://github.com/tylersatter13/mermaid-preview#readme",
+  "bugs": {
+    "url": "https://github.com/tylersatter13/mermaid-preview/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },

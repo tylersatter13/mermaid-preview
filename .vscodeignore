@@ -4,5 +4,14 @@ fixtures/**
 node_modules/**
 tsconfig*.json
 esbuild.mjs
+vitest.config.ts
 .superpowers/**
+.claude/**
+.gitignore
 docs/**
+scripts/**
+azure-icons.json
+dist/**/*.map
+dist/**/*.d.ts
+media/icon.svg
+*.vsix
