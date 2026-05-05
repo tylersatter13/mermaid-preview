@@ -116,20 +116,36 @@ async function sendIcons(cacheDir: string, context: vscode.ExtensionContext) {
     } else {
       // Local file path — resolve and load on the extension side
       let absPath: string | undefined;
-      if (path.isAbsolute(entry)) {
-        absPath = entry;
+      let resolvedEntry = entry;
+
+      // Expand ~ to home directory
+      if (resolvedEntry.startsWith('~/') || resolvedEntry === '~') {
+        const home = process.env.HOME || process.env.USERPROFILE || '';
+        resolvedEntry = path.join(home, resolvedEntry.slice(2));
+      }
+
+      if (path.isAbsolute(resolvedEntry)) {
+        try {
+          await vscode.workspace.fs.stat(vscode.Uri.file(resolvedEntry));
+          absPath = resolvedEntry;
+        } catch {
+          vscode.window.showWarningMessage(
+            `Mermaid Preview: Icon pack file not found at "${resolvedEntry}".`,
+          );
+          continue;
+        }
       } else {
         // Search multiple locations for relative paths
         const candidates: string[] = [];
         if (workspaceRoot) {
-          candidates.push(path.resolve(workspaceRoot, entry));
+          candidates.push(path.resolve(workspaceRoot, resolvedEntry));
         }
         const activeDoc = vscode.window.activeTextEditor?.document;
         if (activeDoc && !activeDoc.isUntitled) {
-          candidates.push(path.resolve(path.dirname(activeDoc.uri.fsPath), entry));
+          candidates.push(path.resolve(path.dirname(activeDoc.uri.fsPath), resolvedEntry));
         }
         // Also try relative to extension install directory
-        candidates.push(path.resolve(context.extensionUri.fsPath, entry));
+        candidates.push(path.resolve(context.extensionUri.fsPath, resolvedEntry));
 
         for (const candidate of candidates) {
           try {
@@ -141,7 +157,9 @@ async function sendIcons(cacheDir: string, context: vscode.ExtensionContext) {
           }
         }
         if (!absPath) {
-          console.warn(`Cannot find icon pack "${entry}" in any of: ${candidates.join(', ')}`);
+          vscode.window.showWarningMessage(
+            `Mermaid Preview: Cannot find icon pack "${entry}". Searched: ${candidates.join(', ')}`,
+          );
           continue;
         }
       }
@@ -151,10 +169,14 @@ async function sendIcons(cacheDir: string, context: vscode.ExtensionContext) {
         if (json.prefix && json.icons) {
           packs.push({ prefix: json.prefix, icons: json.icons });
         } else {
-          console.warn(`Icon pack "${absPath}" missing prefix or icons`);
+          vscode.window.showWarningMessage(
+            `Mermaid Preview: Icon pack "${absPath}" is missing required "prefix" or "icons" fields.`,
+          );
         }
       } catch (err) {
-        console.warn(`Failed to load icon pack "${absPath}":`, err);
+        vscode.window.showWarningMessage(
+          `Mermaid Preview: Failed to load icon pack "${absPath}": ${err instanceof Error ? err.message : err}`,
+        );
       }
     }
   }

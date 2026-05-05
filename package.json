@@ -75,7 +75,7 @@
         "mermaidPreview.iconPacks": {
           "type": "array",
           "default": [],
-          "description": "URLs to Iconify JSON icon packs (e.g. https://unpkg.com/@iconify-json/logos@1/icons.json).",
+          "description": "Paths or URLs to Iconify JSON icon packs. Supports remote URLs (https://...), absolute paths, paths relative to the workspace root, or ~/home paths.",
           "items": {
             "type": "string"
           }
