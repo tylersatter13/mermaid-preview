@@ -35,12 +35,92 @@ interface ExportRequestMessage {
 type IncomingMessage = UpdateMessage | IconPacksMessage | ThemeMessage | ExportRequestMessage;
 
 const vscodeApi = acquireVsCodeApi();
+const diagramViewport = document.getElementById('diagram-viewport')!;
 const diagramContainer = document.getElementById('diagram-container')!;
 const errorOverlay = document.getElementById('error-overlay')!;
+const zoomLevelDisplay = document.getElementById('zoom-level')!;
 
 let currentTheme = 'dark';
 let renderCounter = 0;
 let lastGoodSvg = '';
+
+// --- Zoom & Pan ---
+const ZOOM_MIN = 0.1;
+const ZOOM_MAX = 5;
+const ZOOM_STEP = 0.1;
+let currentZoom = 1;
+
+function setZoom(level: number) {
+  currentZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, level));
+  diagramContainer.style.transform = `scale(${currentZoom})`;
+  zoomLevelDisplay.textContent = `${Math.round(currentZoom * 100)}%`;
+  vscodeApi.setState({ ...((vscodeApi.getState() as any) || {}), zoom: currentZoom });
+}
+
+function zoomIn() { setZoom(currentZoom + ZOOM_STEP); }
+function zoomOut() { setZoom(currentZoom - ZOOM_STEP); }
+function zoomReset() { setZoom(1); }
+
+// Ctrl+scroll to zoom
+diagramViewport.addEventListener('wheel', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    setZoom(currentZoom + delta);
+  }
+}, { passive: false });
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomIn(); }
+    else if (e.key === '-') { e.preventDefault(); zoomOut(); }
+    else if (e.key === '0') { e.preventDefault(); zoomReset(); }
+  }
+});
+
+// Middle-click or left-click drag to pan
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let scrollStartX = 0;
+let scrollStartY = 0;
+
+diagramViewport.addEventListener('mousedown', (e) => {
+  // Left button (with no modifier needed) or middle button
+  if (e.button === 0 || e.button === 1) {
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    scrollStartX = diagramViewport.scrollLeft;
+    scrollStartY = diagramViewport.scrollTop;
+    diagramViewport.classList.add('panning');
+    e.preventDefault();
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  diagramViewport.scrollLeft = scrollStartX - (e.clientX - panStartX);
+  diagramViewport.scrollTop = scrollStartY - (e.clientY - panStartY);
+});
+
+window.addEventListener('mouseup', () => {
+  isPanning = false;
+  diagramViewport.classList.remove('panning');
+});
+
+// Zoom buttons
+document.getElementById('btn-zoom-in')?.addEventListener('click', zoomIn);
+document.getElementById('btn-zoom-out')?.addEventListener('click', zoomOut);
+document.getElementById('btn-zoom-reset')?.addEventListener('click', zoomReset);
+
+// Restore zoom from state
+const savedState = vscodeApi.getState() as { zoom?: number } | undefined;
+if (savedState?.zoom) {
+  currentZoom = savedState.zoom;
+  setZoom(currentZoom);
+}
 
 function initMermaid(theme: string) {
   mermaid.initialize({
@@ -152,3 +232,4 @@ window.addEventListener('message', async (event) => {
 });
 
 initMermaid(currentTheme);
+vscodeApi.postMessage({ type: 'ready' });

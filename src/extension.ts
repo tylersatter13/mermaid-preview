@@ -16,19 +16,24 @@ export function activate(context: vscode.ExtensionContext) {
       if (!previewPanel) {
         previewPanel = new PreviewPanel(context.extensionUri);
       }
+      // Capture the active editor before showing the panel (which shifts focus)
+      const editor = vscode.window.activeTextEditor;
+
       previewPanel.show();
 
-      // Send initial content from active editor
-      const editor = vscode.window.activeTextEditor;
-      if (editor && editor.document.languageId === 'mermaid') {
-        previewPanel.sendUpdate(editor.document.getText());
-      }
+      // Wait for webview script to initialize before sending any data
+      await previewPanel.whenReady();
 
-      // Resolve and send icons
-      await sendIcons(cacheDir);
+      // Resolve and send icons before initial content so they're registered first
+      await sendIcons(cacheDir, context);
 
       // Send theme
       sendTheme();
+
+      // Send initial content from active editor (after icons are registered)
+      if (editor && editor.document.languageId === 'mermaid') {
+        previewPanel.sendUpdate(editor.document.getText());
+      }
 
       // Set up export handler
       previewPanel.onExportData(async (format, data) => {
@@ -63,7 +68,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (e.affectsConfiguration('mermaidPreview.icons') || e.affectsConfiguration('mermaidPreview.iconPacks')) {
-        await sendIcons(cacheDir);
+        await sendIcons(cacheDir, context);
+        // Re-render with newly registered icons
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor && activeEditor.document.languageId === 'mermaid') {
+          previewPanel?.sendUpdate(activeEditor.document.getText());
+        }
       }
       if (e.affectsConfiguration('mermaidPreview.theme')) {
         sendTheme();
@@ -88,15 +98,67 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-async function sendIcons(cacheDir: string) {
+async function sendIcons(cacheDir: string, context: vscode.ExtensionContext) {
   if (!previewPanel) return;
 
   const config = vscode.workspace.getConfiguration('mermaidPreview');
   const icons = config.get<Record<string, string>>('icons') || {};
-  const packUrls = config.get<string[]>('iconPacks') || [];
+  const packEntries = config.get<string[]>('iconPacks') || [];
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
   const packs = await resolveAllIcons(icons, workspaceRoot, cacheDir);
+
+  // Separate local files from remote URLs
+  const packUrls: string[] = [];
+  for (const entry of packEntries) {
+    if (entry.startsWith('http://') || entry.startsWith('https://')) {
+      packUrls.push(entry);
+    } else {
+      // Local file path — resolve and load on the extension side
+      let absPath: string | undefined;
+      if (path.isAbsolute(entry)) {
+        absPath = entry;
+      } else {
+        // Search multiple locations for relative paths
+        const candidates: string[] = [];
+        if (workspaceRoot) {
+          candidates.push(path.resolve(workspaceRoot, entry));
+        }
+        const activeDoc = vscode.window.activeTextEditor?.document;
+        if (activeDoc && !activeDoc.isUntitled) {
+          candidates.push(path.resolve(path.dirname(activeDoc.uri.fsPath), entry));
+        }
+        // Also try relative to extension install directory
+        candidates.push(path.resolve(context.extensionUri.fsPath, entry));
+
+        for (const candidate of candidates) {
+          try {
+            await vscode.workspace.fs.stat(vscode.Uri.file(candidate));
+            absPath = candidate;
+            break;
+          } catch {
+            // Not found at this location, try next
+          }
+        }
+        if (!absPath) {
+          console.warn(`Cannot find icon pack "${entry}" in any of: ${candidates.join(', ')}`);
+          continue;
+        }
+      }
+      try {
+        const raw = await vscode.workspace.fs.readFile(vscode.Uri.file(absPath));
+        const json = JSON.parse(Buffer.from(raw).toString('utf-8'));
+        if (json.prefix && json.icons) {
+          packs.push({ prefix: json.prefix, icons: json.icons });
+        } else {
+          console.warn(`Icon pack "${absPath}" missing prefix or icons`);
+        }
+      } catch (err) {
+        console.warn(`Failed to load icon pack "${absPath}":`, err);
+      }
+    }
+  }
+
   previewPanel.sendIconPacks(packs, packUrls);
 }
 

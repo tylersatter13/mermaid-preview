@@ -17,6 +17,8 @@ export class PreviewPanel implements vscode.Disposable {
       return;
     }
 
+    this._readyPromise = undefined;
+    this._readyResolve = undefined;
     this.panel = vscode.window.createWebviewPanel(
       'mermaidPreview',
       'Mermaid Preview',
@@ -67,8 +69,23 @@ export class PreviewPanel implements vscode.Disposable {
   }
 
   private _exportCallback?: (format: string, data: string) => void;
+  private _readyResolve?: () => void;
+  private _readyPromise: Promise<void> | undefined;
+
+  whenReady(): Promise<void> {
+    if (!this._readyPromise) {
+      this._readyPromise = new Promise((resolve) => {
+        this._readyResolve = resolve;
+      });
+    }
+    return this._readyPromise;
+  }
 
   private async handleWebviewMessage(message: any) {
+    if (message.type === 'ready') {
+      this._readyResolve?.();
+      return;
+    }
     if (message.type === 'exportData' && this._exportCallback) {
       this._exportCallback(message.format, message.data);
     }
@@ -85,8 +102,9 @@ export class PreviewPanel implements vscode.Disposable {
 
     const config = vscode.workspace.getConfiguration('mermaidPreview');
     const packUrls: string[] = config.get<string[]>('iconPacks') || [];
-    const connectSrc = packUrls.length > 0
-      ? packUrls.map((u) => new URL(u).origin).join(' ') + ' '
+    const remoteUrls = packUrls.filter((u) => u.startsWith('http://') || u.startsWith('https://'));
+    const connectSrc = remoteUrls.length > 0
+      ? remoteUrls.map((u) => new URL(u).origin).join(' ') + ' '
       : '';
 
     return `<!DOCTYPE html>
@@ -106,11 +124,18 @@ export class PreviewPanel implements vscode.Disposable {
 </head>
 <body>
   <div id="toolbar">
+    <button id="btn-zoom-in" title="Zoom In (Ctrl +)">+</button>
+    <button id="btn-zoom-out" title="Zoom Out (Ctrl -)">−</button>
+    <button id="btn-zoom-reset" title="Reset Zoom (Ctrl 0)">Reset</button>
+    <span id="zoom-level">100%</span>
+    <span class="toolbar-separator"></span>
     <button id="btn-export-svg">Export SVG</button>
     <button id="btn-export-png">Export PNG</button>
   </div>
-  <div id="diagram-container">
-    <p style="opacity:0.5">Open a .mmd file and start typing to see the preview</p>
+  <div id="diagram-viewport">
+    <div id="diagram-container">
+      <p style="opacity:0.5">Open a .mmd file and start typing to see the preview</p>
+    </div>
   </div>
   <div id="error-overlay"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>

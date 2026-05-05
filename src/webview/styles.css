@@ -33,17 +33,46 @@ body {
   background: var(--vscode-button-hoverBackground, #1177bb);
 }
 
+#diagram-viewport {
+  overflow: auto;
+  min-height: calc(100vh - 45px);
+  cursor: grab;
+  position: relative;
+}
+
+#diagram-viewport.panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
 #diagram-container {
   padding: 16px;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  min-height: calc(100vh - 45px);
+  transform-origin: 0 0;
+  min-width: fit-content;
+  min-height: fit-content;
 }
 
 #diagram-container svg {
-  max-width: 100%;
+  max-width: none;
   height: auto;
+}
+
+#zoom-level {
+  font-size: 12px;
+  line-height: 24px;
+  min-width: 40px;
+  text-align: center;
+  color: var(--vscode-editor-foreground, #d4d4d4);
+}
+
+.toolbar-separator {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--vscode-panel-border, #333);
 }
 
 #error-overlay {
